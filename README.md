@@ -2,3 +2,4 @@
 - Run with `py main.py`
 - Place block -> `right click`
 - Destroy block -> `left click`
+- Open menu -> `escape`
