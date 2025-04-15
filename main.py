@@ -1,5 +1,6 @@
 from ursina import *
 from ursina.prefabs.first_person_controller import FirstPersonController
+from pathlib import Path
 
 app = Ursina()
 player = FirstPersonController()
@@ -7,6 +8,7 @@ Sky()
 
 boxes = []
 menu_open = False
+texture_path = Path('textures/blocks/').as_posix()
 
 for i in range(40):
     for j in range(40):
@@ -14,7 +16,7 @@ for i in range(40):
             color=color.white,
             model='cube',
             position=(j, 0, i),
-            texture='grass_carried.png',
+            texture=f'{texture_path}/grass_carried.png', 
             parent=scene,
             origin_y=0.5
         )
@@ -66,7 +68,7 @@ def input(key):
                         color=color.white,
                         model='cube',
                         position=box.position + mouse.normal,
-                        texture='planks_birch.png',
+                        texture=f'{texture_path}/planks_birch.png',
                         parent=scene,
                         origin_y=0.5
                     )
