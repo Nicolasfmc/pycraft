@@ -1,8 +1,15 @@
-from ursina import *
+from ursina import Ursina, Entity, Button, Sprite, Sky, color, window, camera, scene, mouse, destroy
 from ursina.prefabs.first_person_controller import FirstPersonController
 from pathlib import Path
+from menu import GameMenu
 
 app = Ursina()
+
+fullscreen_state = [False]
+
+def toggle_fullscreen():
+    window.fullscreen = not window.fullscreen
+    fullscreen_state[0] = window.fullscreen
 
 texture_path = Path('textures/blocks/').as_posix()
 
@@ -18,62 +25,45 @@ selected_block_index = 0
 def get_current_block_texture():
     return f'{texture_path}/{block_types[selected_block_index][1]}'
 
-player = FirstPersonController()
 Sky()
 
 boxes = []
 for i in range(40):
     for j in range(40):
-        box = Button(
-            color=color.white,
+        box = Entity(
+            parent=scene,
             model='cube',
             position=(j, 0, i),
             texture=f'{texture_path}/grass_carried.png',
-            parent=scene,
-            origin_y=0.5
+            origin_y=0.5,
+            collider='box',
+            color=color.white
         )
         boxes.append(box)
 
-menu_open = False
+highlighted_box = [None]
+def highlight_box(box):
+    if highlighted_box[0] and highlighted_box[0] != box:
+        highlighted_box[0].color = color.white
+    box.color = color.rgba(255,255,255,255)
+    highlighted_box[0] = box
 
-menu_bg = Entity(
-    parent=camera.ui,
-    model='quad',
-    color=color.rgba(0, 0, 0, 180),
-    scale=(0.5, 0.4),
-    enabled=False
-)
+def unhighlight_box(box):
+    box.color = color.white
+    if highlighted_box[0] == box:
+        highlighted_box[0] = None
 
-def toggle_menu(state):
-    global menu_open
-    menu_open = state
-    menu_bg.enabled = state
-    mouse.locked = not state
-    player.enabled = not state
+player = FirstPersonController()
 
-btn_continue = Button(
-    text='Continuar',
-    color=color.azure,
-    scale=(0.4, 0.1),
-    position=(0, 0.05),
-    parent=menu_bg,
-    on_click=lambda: toggle_menu(False)
-)
+menu = None
 
-btn_exit = Button(
-    text='Sair',
-    color=color.red,
-    scale=(0.4, 0.1),
-    position=(0, -0.1),
-    parent=menu_bg,
-    on_click=application.quit
-)
+def on_menu_toggle(state):
+    pass
+
+menu = GameMenu(player, on_menu_toggle, toggle_fullscreen)
 
 hotbar_bg = Entity(
     parent=camera.ui,
-    model='quad',
-    color=color.clear,
-    scale=(1, 1),
     position=(0, -0.4)
 )
 
@@ -87,19 +77,16 @@ def create_hotbar_ui():
     for i, (block_name, block_texture) in enumerate(block_types):
         slot = Button(
             parent=hotbar_bg,
-            model='quad',
             text='',
             scale=(0.12, 0.12),
             position=(start_x + i*spacing, 0),
-            color=color.clear,
             highlight_color=color.clear,
             pressed_color=color.clear
         )
-        
-        icon = Sprite(
+        Sprite(
             parent=slot,
             texture=f'{texture_path}/{block_texture}',
-            scale=0.8,                 
+            scale=0.8,
             position=(0, 0, -0.1)
         )
         hotbar_slots.append(slot)
@@ -116,12 +103,14 @@ create_hotbar_ui()
 update_hotbar_ui()
 
 def input(key):
-    global menu_open, selected_block_index
+    global selected_block_index
 
     if key == 'escape':
-        toggle_menu(not menu_open)
+        if menu:
+            menu.toggle_menu(not menu.menu_open)
+        return
 
-    if not menu_open:
+    if menu and not menu.menu_open:
         if key.isdigit():
             idx = int(key) - 1
             if 0 <= idx < len(block_types):
@@ -137,18 +126,22 @@ def input(key):
 
         for box in boxes:
             if box.hovered:
+                highlight_box(box)
                 if key == 'right mouse down':
-                    new_block = Button(
-                        color=color.white,
+                    new_block = Entity(
+                        parent=scene,
                         model='cube',
                         position=box.position + mouse.normal,
                         texture=get_current_block_texture(),
-                        parent=scene,
-                        origin_y=0.5
+                        origin_y=0.5,
+                        collider='box',
+                        color=color.white
                     )
                     boxes.append(new_block)
                 if key == 'left mouse down':
                     boxes.remove(box)
                     destroy(box)
+            else:
+                unhighlight_box(box)
 
 app.run()
