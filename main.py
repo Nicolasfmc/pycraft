@@ -1,7 +1,9 @@
 from ursina import Ursina, Entity, Button, Sprite, Sky, color, window, camera, scene, mouse, destroy
 from ursina.prefabs.first_person_controller import FirstPersonController
 from pathlib import Path
+import math
 from menu import GameMenu
+from ursina import invoke, Audio, time, application
 
 app = Ursina()
 
@@ -28,18 +30,21 @@ def get_current_block_texture():
 Sky()
 
 boxes = []
+occupied_positions = set()
 for i in range(40):
     for j in range(40):
+        pos = (j, 0, i)
         box = Entity(
             parent=scene,
             model='cube',
-            position=(j, 0, i),
+            position=pos,
             texture=f'{texture_path}/grass_carried.png',
             origin_y=0.5,
             collider='box',
             color=color.white
         )
         boxes.append(box)
+        occupied_positions.add(pos)
 
 highlighted_box = [None]
 def highlight_box(box):
@@ -54,6 +59,7 @@ def unhighlight_box(box):
         highlighted_box[0] = None
 
 player = FirstPersonController()
+spawn_point = (player.x, player.y, player.z)
 
 menu = None
 
@@ -102,6 +108,23 @@ def update_hotbar_ui():
 create_hotbar_ui()
 update_hotbar_ui()
 
+flash = Entity(
+    parent=camera.ui,
+    model='quad',
+    color=color.rgba(255,255,255,0),
+    scale=(2,2),
+    z=-100,
+    enabled=True
+)
+
+def respawn_flash():
+    flash.color = color.rgba(255,255,255,180)
+    Audio('sounds/damage.mp3', autoplay=True)
+    invoke(lambda *_: setattr(flash, 'color', color.rgba(255,255,255,0)), 0.25)
+
+walk_audio = Audio('sounds/walk-sound.mp3', loop=False, autoplay=False)
+walk_cooldown = [0.0]
+
 def input(key):
     global selected_block_index
 
@@ -143,5 +166,43 @@ def input(key):
                     destroy(box)
             else:
                 unhighlight_box(box)
+
+def generate_blocks_around_player(radius=5):
+    px, py, pz = int(round(player.x)), int(round(player.y)), int(round(player.z))
+    for dx in range(-radius, radius+1):
+        for dz in range(-radius, radius+1):
+            x, z = px+dx, pz+dz
+            pos = (x, 0, z)
+            if pos not in occupied_positions:
+                box = Entity(
+                    parent=scene,
+                    model='cube',
+                    position=pos,
+                    texture=f'{texture_path}/grass_carried.png',
+                    origin_y=0.5,
+                    collider='box',
+                    color=color.white
+                )
+                boxes.append(box)
+                occupied_positions.add(pos)
+
+def update():
+    if player.y < spawn_point[1] - 64:
+        player.position = spawn_point
+        respawn_flash()
+    generate_blocks_around_player(radius=5)
+    moving = False
+    if hasattr(player, 'input_direction'):
+        moving = player.input_direction.magnitude() > 0.1
+    on_ground = player.grounded if hasattr(player, 'grounded') else player.y <= 1
+    dt = 1/60 
+    if player.enabled and moving and on_ground:
+        walk_cooldown[0] -= dt
+        if walk_cooldown[0] <= 0:
+            walk_audio.play()
+            walk_cooldown[0] = 0.45
+    else:
+        walk_cooldown[0] = 0.0
+        walk_audio.stop()
 
 app.run()
