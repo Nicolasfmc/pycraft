@@ -1,0 +1,4 @@
+ursina
+Pillow
+pybind11
+pytest
